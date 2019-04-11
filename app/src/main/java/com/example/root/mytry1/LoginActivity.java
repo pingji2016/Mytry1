@@ -3,6 +3,7 @@ package com.example.root.mytry1;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
@@ -19,6 +20,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -28,9 +30,24 @@ import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.example.root.mytry1.database.MySqlConnection;
+import com.example.root.mytry1.database.MysqlConnect;
+import com.example.root.mytry1.database.QueryDatabase;
+import com.example.root.mytry1.element.User;
+import com.example.root.mytry1.network.LoginService;
+import com.example.root.mytry1.util.PrefUtil;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 import static android.Manifest.permission.READ_CONTACTS;
 
@@ -38,7 +55,9 @@ import static android.Manifest.permission.READ_CONTACTS;
  * A login screen that offers login via email/password.
  */
 public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<Cursor> {
+    private static final String TAG = "LoginActivity";
 
+    private LoginService loginService;
     /**
      * Id to identity READ_CONTACTS permission request.
      */
@@ -92,6 +111,10 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
+
+        mEmailView.setText("3192086411@qq.com");//默认email
+        mPasswordView.setText("123456");
+
     }
 
     private void populateAutoComplete() {
@@ -187,6 +210,64 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             showProgress(true);
             mAuthTask = new UserLoginTask(email, password);
             mAuthTask.execute((Void) null);
+
+            //连接数据库，验证用户合法
+            //MySqlConnection connect=new MySqlConnection();
+            /*
+            Connection connectstate=MySqlConnection.getConn();
+
+            if (connectstate==null) {//连接失败
+                Toast.makeText(getApplicationContext(),"Can't Connet to the database", Toast.LENGTH_LONG);
+                Log.i(TAG,"connect error");
+                focusView = mEmailView;
+                focusView.requestFocus();
+            }
+            else {//链接成功
+                QueryDatabase myquery=new QueryDatabase();
+                if (myquery.Check_Usr(email,password)==true){//验证成功
+                    startActivity(new Intent(LoginActivity.this, Change_act.class));
+                    Log.i(TAG,"success");
+                }else{//失败
+                    Toast.makeText(getApplicationContext(),"Name is not exist or Password is not correct",Toast.LENGTH_LONG);
+                    Log.i(TAG,"possword error");
+                    focusView = mEmailView;
+                    focusView.requestFocus();
+                }
+            }
+            try {
+                connectstate.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+            //MySqlConnection.closeAll(connect,(PreparedStatement) connectstate.prepareStatement(sql););
+            */
+//            MysqlConnect a=new MysqlConnect();
+//            a.Query_data(email);
+
+            loginService = new LoginService(this);
+            loginService.doLogin(email, password, new Callback() {
+                @Override
+                public void onResponse(Call call, Response response) {
+                    User user = (User) response.body();
+
+                    if(user != null) {
+                        if(!user.isError()) {
+                            PrefUtil.putUser(LoginActivity.this, PrefUtil.USER_SESSION, user);
+                            //MainActivity.start(LoginActivity.this);
+                            //LoginActivity.this.finish();
+                            startActivity(new Intent(LoginActivity.this, Change_act.class));
+                            Log.i(TAG,"success");
+                        }
+                        Toast.makeText(LoginActivity.this, user.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                @Override
+                public void onFailure(Call call, Throwable t) {
+                    Toast.makeText(LoginActivity.this, "An error occurred!", Toast.LENGTH_SHORT).show();
+                }
+            });
+
         }
     }
 
